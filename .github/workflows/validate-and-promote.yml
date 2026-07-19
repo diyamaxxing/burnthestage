@@ -1,12 +1,19 @@
+# Validates and promotes pending signups (see scripts/promote.js) into the
+# bestofbootcamp repo. This is the ONLY thing with write access to
+# bestofbootcamp in the whole pipeline, via the BOB_TOKEN secret below —
+# js/auth.js in the main site repo can only write to THIS repo's pending/
+# folder, never directly to bestofbootcamp. Full rationale in
+# ARCHITECTURE_DECISIONS.md (btsbootcamp repo).
+
 name: Validate and promote pending signups
 
 on:
   push:
     paths:
-      - 'pending/**'
+      - 'pending/**' # only run when a signup actually lands, not on every push
 
 permissions:
-  contents: write
+  contents: write # needed for the cleanup commit back to this repo, below
 
 jobs:
   promote:
@@ -16,9 +23,18 @@ jobs:
 
       - name: Validate and promote pending signups
         env:
+          # Scoped ONLY to bestofbootcamp (contents:write) — a repo secret,
+          # never exposed to client code or logs. This is deliberately a
+          # DIFFERENT credential than the one embedded in js/auth.js.
           BOB_TOKEN: ${{ secrets.BOB_TOKEN }}
         run: node scripts/promote.js
 
+      # promote.js deletes processed files from the local checkout but does
+      # not commit that removal itself — that happens here, using the
+      # workflow's own built-in repo permissions (the `contents: write`
+      # above), not BOB_TOKEN. This keeps "cleanup in burnthestage" and
+      # "promotion into bestofbootcamp" on two separate credentials, same
+      # as the rest of this design.
       - name: Remove processed pending files
         run: |
           git config user.name "github-actions[bot]"
