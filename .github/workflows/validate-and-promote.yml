@@ -23,9 +23,6 @@ jobs:
 
       - name: Validate and promote pending signups
         env:
-          # Scoped ONLY to bestofbootcamp (contents:write) — a repo secret,
-          # never exposed to client code or logs. This is deliberately a
-          # DIFFERENT credential than the one embedded in js/auth.js.
           BOB_TOKEN: ${{ secrets.BOB_TOKEN }}
         run: node scripts/promote.js
 
