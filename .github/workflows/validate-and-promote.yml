@@ -1,12 +1,24 @@
-name: Validate and promote pending signups
+name: Validate and promote pending submissions
+
+# Triggered by the btsbootcamp-fanmail Lambda committing a file under
+# pending/. Re-validates signups and comments and promotes accepted ones
+# into bestofbootcamp (canonical state). See
+# btsbootcamp/ARCHITECTURE_DECISIONS.md, "Write pipeline v3".
 
 on:
   push:
     paths:
       - 'pending/**'
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+# Serialize runs so two near-simultaneous submissions can't race on the
+# bestofbootcamp Contents-API PUT or the pending/ cleanup push.
+concurrency:
+  group: promote
+  cancel-in-progress: false
 
 jobs:
   promote:
@@ -14,10 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate and promote pending signups
+      - name: Promote pending signups
         env:
           BOB_TOKEN: ${{ secrets.BOB_TOKEN }}
         run: node scripts/promote.js
+
+      - name: Promote pending comments
+        env:
+          BOB_TOKEN: ${{ secrets.BOB_TOKEN }}
+        run: node scripts/promote-comments.js
 
       - name: Remove processed pending files
         run: |
@@ -25,6 +42,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A pending/
           if ! git diff --cached --quiet; then
-            git commit -m "Clean up processed pending signups"
+            git commit -m "Clean up processed pending submissions"
             git push
           fi
